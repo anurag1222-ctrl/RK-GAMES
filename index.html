@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mines Betting Game</title>
+    <title>Mines Game</title>
     <style>
         * {
             margin: 0;
@@ -22,7 +22,75 @@
             color: white;
         }
         
+        /* Login Styles */
+        .login-container {
+            background: rgba(15, 25, 35, 0.9);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            width: 100%;
+            max-width: 400px;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .login-container h1 {
+            font-size: 2.2rem;
+            margin-bottom: 30px;
+            background: linear-gradient(to right, #00c6ff, #0072ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #a0aec0;
+        }
+        
+        .input-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border-radius: 10px;
+            border: 2px solid #4a5568;
+            background: #1a202c;
+            color: white;
+            font-size: 1rem;
+        }
+        
+        .login-button {
+            width: 100%;
+            padding: 14px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            background: linear-gradient(to right, #00c6ff, #0072ff);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+        
+        .login-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.3);
+        }
+        
+        .error-message {
+            color: #e53e3e;
+            margin-top: 15px;
+            min-height: 20px;
+        }
+        
+        /* Game Styles */
         .game-container {
+            display: none;
             background: rgba(15, 25, 35, 0.9);
             border-radius: 20px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
@@ -30,6 +98,7 @@
             max-width: 800px;
             padding: 25px;
             text-align: center;
+            position: relative;
         }
         
         header {
@@ -150,6 +219,11 @@
             color: #1a202c;
         }
         
+        #logout-button {
+            background: linear-gradient(to right, #f78ca0, #f9748f);
+            color: white;
+        }
+        
         button:hover {
             transform: translateY(-3px);
             box-shadow: 0 6px 8px rgba(0, 0, 0, 0.3);
@@ -259,10 +333,26 @@
     </style>
 </head>
 <body>
-    <div class="game-container">
+    <!-- Login Container -->
+    <div class="login-container" id="login-container">
+        <h1>Mines Game Login</h1>
+        <div class="input-group">
+            <label for="username">Username</label>
+            <input type="text" id="username" placeholder="Enter username">
+        </div>
+        <div class="input-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" placeholder="Enter password">
+        </div>
+        <button class="login-button" id="login-button">LOGIN</button>
+        <div class="error-message" id="error-message"></div>
+    </div>
+
+    <!-- Game Container -->
+    <div class="game-container" id="game-container">
         <header>
             <h1>💎 Mines Game 💣</h1>
-            <p>Reveal gems to multiply your bet. Avoid mines!</p>
+            <p>Welcome, <span id="logged-in-user"></span>! <button id="logout-button" style="padding: 5px 10px; font-size: 0.8rem;">LOGOUT</button></p>
         </header>
         
         <div class="stats-container">
@@ -313,10 +403,33 @@
                 <li>Find more gems to get higher payouts!</li>
             </ul>
         </div>
+        
+        <!-- Audio elements for sound effects -->
+        <audio id="bomb-sound" src="https://assets.mixkit.co/sfx/preview/mixkit-bomb-explosion-1680.mp3" preload="auto"></audio>
+        <audio id="gem-sound" src="https://assets.mixkit.co/sfx/preview/mixkit-winning-chimes-2015.mp3" preload="auto"></audio>
+        <audio id="cashout-sound" src="https://assets.mixkit.co/sfx/preview/mixkit-cash-register-purchase-880.mp3" preload="auto"></audio>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            // DOM elements
+            const loginContainer = document.getElementById('login-container');
+            const gameContainer = document.getElementById('game-container');
+            const loginButton = document.getElementById('login-button');
+            const logoutButton = document.getElementById('logout-button');
+            const usernameInput = document.getElementById('username');
+            const passwordInput = document.getElementById('password');
+            const errorMessage = document.getElementById('error-message');
+            const loggedInUserSpan = document.getElementById('logged-in-user');
+            
+            // Sound effects
+            const bombSound = document.getElementById('bomb-sound');
+            const gemSound = document.getElementById('gem-sound');
+            const cashoutSound = document.getElementById('cashout-sound');
+            
+            // Correct password (in a real app, this would be server-side verification)
+            const CORRECT_PASSWORD = "mines123";
+            
             // Game state
             const gameState = {
                 balance: 1000,
@@ -329,7 +442,7 @@
                 cashoutAvailable: false
             };
             
-            // DOM elements
+            // Game DOM elements
             const balanceEl = document.getElementById('balance');
             const currentBetEl = document.getElementById('current-bet');
             const multiplierEl = document.getElementById('multiplier');
@@ -340,6 +453,54 @@
             const betAmountInput = document.getElementById('bet-amount');
             const mineCountInput = document.getElementById('mine-count');
             const messageEl = document.getElementById('message');
+            
+            // Login function
+            function login() {
+                const username = usernameInput.value.trim();
+                const password = passwordInput.value.trim();
+                
+                // Simple validation
+                if (!username || !password) {
+                    errorMessage.textContent = "Please enter both username and password";
+                    return;
+                }
+                
+                // Check password (insecure - just for demo)
+                if (password !== CORRECT_PASSWORD) {
+                    errorMessage.textContent = "Incorrect password!";
+                    passwordInput.value = "";
+                    return;
+                }
+                
+                // Successful login
+                errorMessage.textContent = "";
+                loggedInUserSpan.textContent = username;
+                
+                // Hide login, show game
+                loginContainer.style.display = "none";
+                gameContainer.style.display = "block";
+                
+                // Initialize the game
+                initializeGame();
+            }
+            
+            // Logout function
+            function logout() {
+                // Clear inputs
+                usernameInput.value = "";
+                passwordInput.value = "";
+                errorMessage.textContent = "";
+                
+                // Show login, hide game
+                loginContainer.style.display = "block";
+                gameContainer.style.display = "none";
+            }
+            
+            // Initialize the game
+            function initializeGame() {
+                updateStats();
+                initializeGrid();
+            }
             
             // Initialize the grid
             function initializeGrid() {
@@ -429,6 +590,8 @@
                 if (gameState.minePositions.includes(index)) {
                     tile.innerHTML = '💣';
                     tile.classList.add('mine');
+                    bombSound.currentTime = 0;
+                    bombSound.play();
                     endGame(false);
                     return;
                 }
@@ -436,6 +599,8 @@
                 // It's a gem
                 tile.innerHTML = '💎';
                 tile.classList.add('gem');
+                gemSound.currentTime = 0;
+                gemSound.play();
                 
                 // Update game state
                 gameState.revealedTiles++;
@@ -462,6 +627,8 @@
                 
                 const winnings = gameState.currentBet * gameState.multiplier;
                 gameState.balance += winnings;
+                cashoutSound.currentTime = 0;
+                cashoutSound.play();
                 
                 endGame(true);
                 showMessage(`You cashed out at ${gameState.multiplier.toFixed(2)}x and won $${winnings.toFixed(2)}!`, "win");
@@ -492,12 +659,10 @@
             
             // Reset game
             function resetGame() {
-                gameState.balance = 1000;
                 gameState.currentBet = 0;
                 gameState.multiplier = 1.00;
                 gameState.gameActive = false;
                 gameState.revealedTiles = 0;
-                gameState.mineCount = 3;
                 gameState.minePositions = [];
                 gameState.cashoutAvailable = false;
                 
@@ -536,13 +701,24 @@
             }
             
             // Event listeners
+            loginButton.addEventListener('click', login);
+            logoutButton.addEventListener('click', logout);
+            
+            // Also allow login with Enter key
+            passwordInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    login();
+                }
+            });
+            
+            // Game event listeners
             betButton.addEventListener('click', placeBet);
             cashoutButton.addEventListener('click', cashout);
             resetButton.addEventListener('click', resetGame);
             
-            // Initialize the game
-            initializeGrid();
-            updateStats();
+            // Initialize with login visible
+            loginContainer.style.display = "block";
+            gameContainer.style.display = "none";
         });
     </script>
 </body>
